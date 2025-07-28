@@ -5,27 +5,9 @@ from typing import Dict, List, Optional
 from asterisk.ami import AMIClient, SimpleAction
 from fastapi import WebSocket
 
-logger = logging.getLogger(__name__)
+from .models import CallEvent, CallState, CallType
 
-class CallEvent:
-    def __init__(self, event_type: str, channel: str, caller_id: str = "", 
-                 extension: str = "", unique_id: str = "", timestamp: str = ""):
-        self.event_type = event_type
-        self.channel = channel
-        self.caller_id = caller_id
-        self.extension = extension
-        self.unique_id = unique_id
-        self.timestamp = timestamp
-    
-    def to_dict(self):
-        return {
-            "event_type": self.event_type,
-            "channel": self.channel,
-            "caller_id": self.caller_id,
-            "extension": self.extension,
-            "unique_id": self.unique_id,
-            "timestamp": self.timestamp
-        }
+logger = logging.getLogger(__name__)
 
 class AsteriskManager:
     def __init__(self, host: str = "localhost", port: int = 5038, 
@@ -72,37 +54,100 @@ class AsteriskManager:
             extension = event.get('Extension', '')
             unique_id = event.get('Uniqueid', '')
             
+            # Determine call type
+            call_type = self._determine_call_type(channel, event.get('Context', ''))
+            
+            # Determine call state
+            call_state = self._determine_call_state(event_type, event.get('ChannelState', ''))
+            
             call_event = CallEvent(
                 event_type=event_type,
                 channel=channel,
                 caller_id=caller_id,
                 extension=extension,
                 unique_id=unique_id,
-                timestamp=event.get('Timestamp', '')
+                timestamp=event.get('Timestamp', ''),
+                call_state=call_state,
+                call_type=call_type
             )
             
             # Handle specific call events
             if event_type == 'Newchannel':
                 self.active_calls[unique_id] = call_event
-                logger.info(f"New call started: {caller_id} -> {extension}")
+                logger.info(f"New {call_type.value} call: {caller_id} -> {extension}")
                 
+                # Handle GSM call routing
+                if call_type == CallType.INCOMING_GSM:
+                    asyncio.create_task(self._handle_incoming_gsm_call(call_event))
+                    
             elif event_type == 'Newstate':
                 if event.get('ChannelState') == '6':  # Up
                     logger.info(f"Call answered: {channel}")
+                    if unique_id in self.active_calls:
+                        self.active_calls[unique_id].call_state = CallState.ANSWERED
                     
             elif event_type == 'Hangup':
                 if unique_id in self.active_calls:
                     del self.active_calls[unique_id]
                 logger.info(f"Call ended: {channel}")
                 
-            elif event_type == 'Dial':
-                logger.info(f"Call dialing: {channel}")
-                
             # Broadcast event to all WebSocket clients
             asyncio.create_task(self._broadcast_event(call_event))
             
         except Exception as e:
             logger.error(f"Error handling AMI event: {e}")
+    
+    def _determine_call_type(self, channel: str, context: str) -> CallType:
+        """Determine the type of call"""
+        if 'gsm' in channel.lower() or context == 'from-gsm':
+            return CallType.INCOMING_GSM
+        elif context == 'from-bevatel':
+            return CallType.SIP_TRUNK
+        elif context == 'from-internal':
+            return CallType.INTERNAL
+        else:
+            return CallType.INCOMING_GSM  # Default to GSM
+    
+    def _determine_call_state(self, event_type: str, channel_state: str) -> CallState:
+        """Determine the call state"""
+        if event_type == 'Newchannel':
+            return CallState.RINGING
+        elif event_type == 'Newstate' and channel_state == '6':
+            return CallState.ANSWERED
+        elif event_type == 'Hangup':
+            return CallState.HANGUP
+        return CallState.RINGING
+    
+    async def _handle_incoming_gsm_call(self, call_event: CallEvent):
+        """Handle incoming GSM call - simple routing to extension 1000"""
+        try:
+            logger.info(f"Routing GSM call from {call_event.caller_id} to extension 1000")
+            await self._route_call(call_event.channel, "1000")
+        except Exception as e:
+            logger.error(f"Error handling incoming GSM call: {e}")
+    
+    async def _route_call(self, channel: str, destination: str):
+        """Route a call to the specified destination"""
+        if not self.connected or not self.client:
+            logger.error("Not connected to Asterisk AMI")
+            return False
+            
+        try:
+            action = SimpleAction(
+                'Redirect',
+                Channel=channel,
+                Context='from-internal',
+                Exten=destination,
+                Priority=1
+            )
+            
+            response = self.client.send_action(action)
+            logger.info(f"Routed call {channel} to {destination}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to route call: {e}")
+            return False
     
     async def _broadcast_event(self, event: CallEvent):
         """Broadcast call event to all connected WebSocket clients"""
@@ -134,50 +179,6 @@ class AsteriskManager:
             self.websocket_clients.remove(websocket)
             logger.info(f"WebSocket client removed. Total clients: {len(self.websocket_clients)}")
     
-    async def originate_call(self, to_number: str, from_number: str, context: str = "from-internal") -> bool:
-        """Originate a call via Asterisk AMI"""
-        if not self.connected or not self.client:
-            logger.error("Not connected to Asterisk AMI")
-            return False
-            
-        try:
-            action = SimpleAction(
-                'Originate',
-                Channel=f'SIP/{to_number}',
-                Context=context,
-                Exten=to_number,
-                Callerid=from_number,
-                Priority=1
-            )
-            
-            response = self.client.send_action(action)
-            logger.info(f"Originated call: {from_number} -> {to_number}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to originate call: {e}")
-            return False
-    
-    async def hangup_call(self, channel: str) -> bool:
-        """Hang up a call via Asterisk AMI"""
-        if not self.connected or not self.client:
-            logger.error("Not connected to Asterisk AMI")
-            return False
-            
-        try:
-            action = SimpleAction(
-                'Hangup',
-                Channel=channel
-            )
-            
-            response = self.client.send_action(action)
-            logger.info(f"Hung up call: {channel}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to hang up call: {e}")
-            return False
-    
     def get_active_calls(self) -> List[Dict]:
         """Get list of active calls"""
         return [call.to_dict() for call in self.active_calls.values()]
@@ -198,4 +199,4 @@ asterisk_manager = AsteriskManager(
     port=5038,
     username="admin",
     password="admin123"
-)
+) 
