@@ -49,18 +49,39 @@ write = all
 
 #### Example Bevatel SIP Trunk
 
-Add to `/etc/asterisk/sip.conf`:
+Add to `/etc/asterisk/pjsip.conf`:
 
 ```
 [bevatel]
-type=peer
-host=sip.bevatel.com
-username=YOUR_BEVATEL_USERNAME
-secret=YOUR_BEVATEL_PASSWORD
-fromuser=YOUR_BEVATEL_USERNAME
+type=endpoint
+transport=local
 context=from-bevatel
-insecure=invite,port
-qualify=yes
+disallow=all
+allow=ulaw
+allow=alaw
+allow=gsm
+outbound_auth=bevatel_auth
+aors=bevatel
+direct_media=no
+force_rport=yes
+rewrite_contact=yes
+rtp_symmetric=yes
+force_avp=yes
+ice_support=yes
+use_ptime=yes
+media_use_received_transport=yes
+media_address=192.168.1.100
+
+[bevatel_auth]
+type=auth
+auth_type=userpass
+username=YOUR_BEVATEL_USERNAME
+password=YOUR_BEVATEL_PASSWORD
+
+[bevatel]
+type=aors
+max_contacts=1
+remove_existing=yes
 ```
 
 #### Example GSM Channel (using chan_dongle or similar)
@@ -84,17 +105,17 @@ Add to `/etc/asterisk/extensions.conf`:
 ```
 [from-bevatel]
 exten => _X.,1,NoOp(Incoming SIP from Bevatel)
- same => n,Dial(Dongle/dongle0/${EXTEN})
+ same => n,Dial(PJSIP/1000,30)
  same => n,Hangup()
 
 [from-gsm]
 exten => _X.,1,NoOp(Incoming GSM call)
- same => n,Dial(SIP/bevatel/${EXTEN})
+ same => n,Dial(PJSIP/1000,30)
  same => n,Hangup()
 
 [from-internal]
 exten => _X.,1,NoOp(Internal call)
- same => n,Dial(SIP/bevatel/${EXTEN})
+ same => n,Dial(PJSIP/bevatel/${EXTEN})
  same => n,Hangup()
 ```
 
@@ -117,7 +138,7 @@ Connect to `ws://localhost:8000/ws/calls` and send JSON messages:
 ```json
 {
     "type": "hangup_call",
-    "channel": "SIP/1234567890-00000001"
+    "channel": "PJSIP/1234567890-00000001"
 }
 ```
 
@@ -140,7 +161,7 @@ Connect to `ws://localhost:8000/ws/calls` and send JSON messages:
 - `GET /status` - Get Asterisk manager status
 - `GET /calls/active` - Get list of active calls
 - `POST /calls/originate?to_number=123&from_number=456` - Originate a call
-- `POST /calls/hangup?channel=SIP/123-00000001` - Hangup a call
+- `POST /calls/hangup?channel=PJSIP/123-00000001` - Hangup a call
 
 #### Test Interface
 
@@ -156,7 +177,7 @@ The system monitors and broadcasts these Asterisk events:
 
 ## Notes
 - This is a POC. Security, error handling, and production hardening are not included.
-- You must have Asterisk and required modules (chan_sip, chan_dongle, etc.) installed.
+- You must have Asterisk and required modules (chan_pjsip, res_pjsip, etc.) installed.
 - Default AMI credentials are admin/admin123. Change these in production.
 - The system automatically connects to Asterisk AMI on startup and disconnects on shutdown.
 - If systemd service fails, use manual startup: `sudo -u asterisk asterisk -f &` 

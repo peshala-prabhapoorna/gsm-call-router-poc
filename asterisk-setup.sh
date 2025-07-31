@@ -45,10 +45,10 @@ menuselect/menuselect --enable CORE-SOUNDS-EN-WAV menuselect.makeopts
 menuselect/menuselect --enable CORE-SOUNDS-EN-GSM menuselect.makeopts
 menuselect/menuselect --enable res_ami menuselect.makeopts
 menuselect/menuselect --enable res_ami_config menuselect.makeopts
-menuselect/menuselect --enable chan_sip menuselect.makeopts
 menuselect/menuselect --enable pbx_config menuselect.makeopts
 menuselect/menuselect --enable res_pjsip menuselect.makeopts
 menuselect/menuselect --enable res_pjsip_config menuselect.makeopts
+menuselect/menuselect --enable chan_pjsip menuselect.makeopts
 
 make -j$(nproc)
 sudo make install
@@ -116,17 +116,16 @@ echo ""
 echo "=== Setup Complete ==="
 echo "Asterisk 22.5 LTS is now running with the following configuration:"
 echo "- AMI enabled on port 5038"
-echo "- SIP enabled on port 5060"
-echo "- PJSIP enabled (modern SIP stack)"
+echo "- PJSIP enabled on port 5060 (modern SIP stack)"
 echo "- Admin credentials: admin/admin123"
 echo ""
 echo "Next steps:"
-echo "1. Update /etc/asterisk/sip.conf with your Bevatel credentials"
-echo "2. Test the connection: sudo asterisk -rx 'sip show peers'"
+echo "1. Update /etc/asterisk/pjsip.conf with your Bevatel credentials"
+echo "2. Test the connection: sudo asterisk -rx 'pjsip show endpoints'"
 echo "3. Start your FastAPI application"
 echo ""
 echo "Useful commands:"
 echo "- Connect to Asterisk CLI: sudo asterisk -r"
-echo "- Check SIP peers: sudo asterisk -rx 'sip show peers'"
+echo "- Check PJSIP endpoints: sudo asterisk -rx 'pjsip show endpoints'"
 echo "- Check AMI status: sudo asterisk -rx 'manager show status'"
 echo "- View logs: sudo tail -f /var/log/asterisk/messages" 
