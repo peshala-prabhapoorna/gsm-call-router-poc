@@ -62,17 +62,16 @@ async def websocket_endpoint(websocket: WebSocket):
         
         # Keep connection alive
         while True:
-            data = await websocket.receive_text()
-            # Just echo back for now
-            await websocket.send_text(json.dumps({
-                "type": "echo",
-                "message": data
-            }))
-                
+            data = await websocket.receive_bytes()
+            print(f"Received {len(data)} bytes")
+
+            # For testing, echo back same audio
+            await websocket.send_bytes(data)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
         asterisk_manager.remove_websocket_client(websocket)
+        await websocket.close()
 
 @app.get("/test", response_class=HTMLResponse)
 async def test_page():
