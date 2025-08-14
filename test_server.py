@@ -4,8 +4,8 @@ import logging
 import sys
 import uuid
 import traceback
-from ast_media_websocket import AstMediaWebSocketServer
-from ast_ari_websocket import AstAriWebSocketServer
+from media_websocket import AstMediaWebSocketServer
+from ari_websocket import AstAriWebSocketServer
 
 logger = logging.getLogger(__name__)
 
