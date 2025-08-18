@@ -190,27 +190,3 @@ class AstAriWebSocketServer(AstAriWebSocket):
             self.server.close()
             await self.server.wait_closed()
             self.server = None
-
-class AstAriWebSocketClient(AstAriWebSocket):
-    def __init__(self, host, port, app, credentials, tag=None, log_level=None):
-        """
-        Initializes the media websocket client.
-        :param uri: The URI to connect to the media websocket.
-        :param tag: Optional tag for logging.
-        """
-        super().__init__(tag, log_level)
-        self.host = host
-        self.port = port
-        self.app = app
-        self.credentials = credentials
-
-    async def connect(self):
-        """
-        Connects to the ARI WebSocket server.
-        This method is used for client connections to the Asterisk ARI server.
-        """
-        uri = f"ws://{self.host}:{self.port}/ari/events?subscribeAll=false&app={self.app}&api_key={':'.join(self.credentials)}"
-        self.log(INFO, f"Connecting to ARI at {uri}")
-        async with connect(uri) as websocket:
-            await self.handle_connection(websocket)
-

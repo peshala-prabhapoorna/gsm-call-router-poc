@@ -146,24 +146,3 @@ class AstMediaWebSocketServer(AstMediaWebSocket):
             self.server.close()
             await self.server.wait_closed()
             self.server = None
-
-class AstMediaWebSocketClient(AstMediaWebSocket):
-    def __init__(self, host, port, connection_id, tag=None, log_level=None):
-        """
-        Initializes the media websocket client.
-        :param uri: The URI to connect to the media websocket.
-        :param tag: Optional tag for logging.
-        """
-        super().__init__(tag, log_level)
-        self.host = host
-        self.port = port
-        self.connection_id = connection_id
-
-    async def connect(self):
-        """
-        Connects to the media websocket and starts processing media.
-        """
-        uri = f"ws://{self.host}:{self.port}/media/{self.connection_id}"
-        self.log(INFO, f"Connecting to Media at {uri}")
-        async with connect(uri, subprotocols=["media"]) as ws_media:
-            await self.process_media(ws_media)
