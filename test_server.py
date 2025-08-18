@@ -59,9 +59,9 @@ class ast_ws_server(AstAriWebSocketServer):
                       { "name": "channelId", "value": sess.ws_channel },
                       { "name": "app", "value": msg['application'] },
                       { "name": "data", "value": "websocket" },
-                      { "name": "external_host", "value": f"{self.media_host}:{self.media_port}" },
-                      { "name": "transport", "value": "udp" },
-                      { "name": "encapsulation", "value": "rtp" },
+                      { "name": "external_host", "value": "media_connection1" },
+                      { "name": "transport", "value": "websocket" },
+                      { "name": "encapsulation", "value": "none" },
                       { "name": "format", "value": "ulaw" },
                       ])
 
@@ -128,6 +128,7 @@ async def main(args):
                     tag="ari_ws_server",
                     log_level=logging.INFO
                     )
+
     try:
         await event_handler.listen()
     except Exception as e:

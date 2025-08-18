@@ -104,6 +104,10 @@ class AstMediaWebSocket:
         finally:
             self.log(INFO, f"Media disconnected")
 
+    async def debug_process_request(self, connection, request):
+        self.log(INFO, f"Incoming request: path={request.path}, headers={dict(request.headers)}")
+        return None  # None means "continue with normal handshake"
+
 class AstMediaWebSocketServer(AstMediaWebSocket):
     def __init__(self, host, port, credentials, protocol, tag=None, log_level=None):
         """
